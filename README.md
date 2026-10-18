@@ -1,254 +1,210 @@
-# WHOP AUTOMATION v2.0
+<div align="center">
 
-> High-performance, anti-fingerprint automated checkout engine with BasisTheory tokenization, TLS browser impersonation, and a live zero-flicker ANSI dashboard.
+# Owned Group Check
 
-[![Version](https://img.shields.io/badge/version-2.0-blue.svg?style=for-the-badge)](https://github.com)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](https://opensource.org/license/mit)
-[![TLS](https://img.shields.io/badge/TLS-curl__cffi%20impersonation-orange.svg?style=for-the-badge)](https://github.com/lexiforest/curl_cffi)
-[![TUI](https://img.shields.io/badge/TUI-zero--flicker%20ANSI-brightgreen.svg?style=for-the-badge)](core/terminal_ui.py)
+**Asynchronously scan all Rank 255 groups from `.ROBLOSECURITY` cookies, with split auth Direct IP / public-over-Tor routing, live Discord embeds, and an in-RAM `scan_report.zip`.**
 
----
+[![Version](https://img.shields.io/badge/version-v2.5.0-00E5FF?style=for-the-badge)](main.py)
+[![Python](https://img.shields.io/badge/python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](requirements.txt)
+[![License: MIT](https://img.shields.io/badge/License-MIT-FFD700?style=for-the-badge)](#8-license)
 
-## 1. Visual & Demo
+</div>
+
+## 1. Demo
 
 ![Demo](assets/demo.gif)
 
-The dashboard is rendered with pure ANSI sequences via `core/terminal_ui.py` (`\x1b[H`, `\x1b[J`, `\x1b[K`), hiding/restoring the cursor and updating state in real time without flickering. Terminal preview (simulated to match the actual render layout):
+Terminal preview (dashboard ANSI, `main.py`):
 
 ```text
-WHOP AUTOMATION v2.0                                          ● RUNNING  00:04:18
+ROBLOX GROUP OWNER SCANNER  v2.5.0
+Status      : RUNNING
 
-IDENTITY
-  Account            user_gen8492@gmail.com
-  Target             https://whop.com/checkout/plan_xxxxxxxxxxxx/
-  Plan               Membership Access (plan_xxxxxxxxxxxx)
-  Mode               CCN Bypass CVC
-  Proxy Pool         12 / 12 alive
+Target Acc  : LakoAcc01 (ID: 123456789)
+Account Turn: 1/10
+Group Queue : 14/42
+Tor Network : Enabled (2 tunnels)
+Filters     : R$100+ · pend 50+
 
-METRICS
-  Progress           18 / 50  (36%)
-  Hits               1
-  Declines           16
-  Decline Streak     2 / 5
-  Retries            1
-  Active Card        462239******0413  Visa Credit (US)
-  Profile            mac_chrome
+-- METRICS ---------------------------------------------
+  Owner Groups             42        Total Robux          15,400
+  Filter Match              3        Pending Robux         4,200
+  Skipped                  11        Partial Data              0
 
-ACTIVITY
-  [14:20:11]  ●  Processing 462239******0413
-  [14:20:12]  ●  IP 198.51.100.24 | risk 0 | user_gen8492@gmail.com
-  [14:20:16]  ✔  HIT 462239******0413 — 25.00 USD (Membership Access)
-  [14:20:17]  …  Saved to data/output/whop_hits.txt
-  [14:20:19]  ✖  Decline 462239******5678 — card_declined - Your card was declined. (streak 1/5)
+-- ACTIVITY --------------------------------------------
+> 14:50:01  Account LakoAcc01 · ID 123456789 · 42 owner groups.
+> 14:50:04  MATCH Group Alpha · id 1234567 · robux 12,000>=100 -> webhook ok
 
 [Ctrl+C to stop]
 ```
 
----
+Discord preview (actual output from `AccountStatus` + `send_grand_totals_webhook`):
 
-## 2. Purpose & Features
+```text
+✅ [ACC 1/10] LakoAcc01
+status  : FINISHED
+checked : 42/42
+robux   : 15,400
+pending : 4,200
+👑 Matched Groups (2)
+• [1234567](https://www.roblox.com/groups/1234567) — 12,000 Robux · 4,000 Pending
+• [8889999](https://www.roblox.com/groups/8889999) [⚠ LOST OWNERSHIP] — 3,400 Robux
 
-An automated checkout engine for payment flow research, infrastructure testing, and authorized security auditing. Built around speed, browser fingerprint camouflage, and proxy/token infrastructure management.
+💎 Grand Totals — All accounts
+accounts: 10
+groups  : 420
+matched : 15
+robux   : 85,000
+pending : 12,500
+combined: 97,500
+📎 scan_report.zip (matched_groups.txt + unresolved_groups.txt)
+```
 
-### Tokenization & Payment Orchestration
-- Full Basis Theory Hosted Elements flow: session bootstrap, card container packaging, session key activation, independent expiry/CVC PATCH, and Confirmation Token extraction.
-- Two card handling modes: **Mode 1 — CCN Bypass CVC** and **Mode 2 — Full CVV**.
-- BIN-based card generation with proper Luhn checksum (`generate_cards_from_bin`, default 50 cards/BIN, duplicate protection via hash set).
+Report style (1 group / 1 line, no table borders):
 
-### Anti-Fingerprint & Hardware Emulation
-- TLS/JA3/JA4 and HTTP/2 fingerprint impersonation via `curl_cffi`: Chrome 124/131/136, Safari 17/18, Firefox 133.
-- 18 hardware profiles (`core/hardware_profiles.py`): WebGL Vendor/Renderer, Canvas/Audio hash, Screen Resolution, Device Pixel Ratio, Hardware Concurrency, Sentry Tracing headers.
-- Behavior telemetry v1 (`core/telemetry.py`): focus/paste/change/blur event chains with Gaussian distribution (`_rgauss`), session UUID, and WebRTC local IP.
+```text
+# matched_groups.txt — sorted descending by robux+pending
+https://www.roblox.com/groups/1234567 - LakoAcc01 - 12,000 Robux · 4,000 Pending
+https://www.roblox.com/groups/8889999 - LakoAcc01 - 3,400 Robux · 25 Clothing
 
-### Proxy Management & Concurrency
-- **Multi-threaded pre-flight health check**: `ThreadPoolExecutor` (default 20 workers) validating every proxy via `ip-api.com` — IP, latency, timezone, country code.
-- **Geo-routing billing matcher**: offline matcher mapping proxy/BIN country to real billing addresses across 16 countries (US, GB, CA, AU, DE, FR, BR, VN, NL, IE, ES, IT, MX, JP, IN, RO) in `core/bin_matcher.py`.
-- **Smart eviction**: dead proxies are dropped on TLS/timeout errors; the pool is only kept when more than one proxy remains.
+# unresolved_groups.txt
+https://www.roblox.com/groups/4443332 - LakoAcc01
+```
 
-### Resilience & Flow Control
-- Per-attempt checkout/confirm data caching, isolating state between cards.
-- Safe auto-stop after **5 consecutive declines** (decline streak), printing a session summary before exit.
-- **Webhooks**: automatic HIT notifications via Discord Rich Embed and Telegram HTML (`core/notifier.py`).
+## 2. Features
 
----
+- **Async engine (`asyncio` + `aiohttp`, `main.py` ~3,198 lines / 88 functions):** scans groups concurrently with `Semaphore(3)`, fetching 6 API branches (`currency`, `revenue`, `games`, `clothing`, `thumbnail`, `basic`) in a single guarded `gather` call with timeout protection.
+- **Token-safe split session:** requests carrying `.ROBLOSECURITY` / `x-csrf-token` always go over the origin IP; public data (games, visits, clothing, group info) uses a bare session, routed through Tor when enabled.
+- **Multi-instance Tor (`tor/tor_manager.py` + `tor/tor.exe`):** each account / re-check round uses a dedicated `IsolateSOCKSAuth` credential to force a fresh circuit and exit IP.
+- **Rate-limit resistance:** `DomainPacer` paces requests per domain, doubles the interval on 429 and cools down after a success streak; 403 responses auto-heal by picking up the new `x-csrf-token` for retry.
+- **Two-layer ownership verification:** filters `rank == 255`, then cross-checks `owner.userId` against `current_user_id`; groups stuck at rank 255 without real ownership are flagged `[⚠ LOST OWNERSHIP]` (`fake_own`).
+- **2-round re-check:** `PARTIAL` / `SENT_PARTIAL` / `FAIL` / `WEBHOOK_FAIL` results are retried on failed branches only (`_ok`), with `_undo_result_stats` reverting old stats first so totals are never double-counted; preserves the invariant `checked_success + checked_failed == owned_groups`.
+- **Compact reporting:** one auto-`PATCH`ed Discord message per account (`MAX_LISTED = 15`, sorted descending by `robux+pending`); one Grand Totals YAML embed at the end (6 core lines plus conditional `recheck/partial/failed/fake_own`) with `scan_report.zip` compressed in RAM via `io.BytesIO` + `zipfile` (no junk files on disk).
+- **Verified:** `python -m py_compile main.py` passes; `test_status_embed.py` / `test_smoke.py` / `test_ui_dash.py` all report `ALL TESTS PASSED`.
 
 ## 3. Disclaimer & Security Warning
 
-> **LEGAL WARNING & TERMS OF USE**
+> [!CAUTION]
+> **Read carefully before use:**
 >
-> This tool is developed for security research, educational purposes, and self-testing of payment infrastructure (authorized security auditing). The author accepts **no responsibility** for any misuse, financial damage, or **account suspension** resulting from violations of third-party Terms of Service. You use it entirely at your own risk.
+> - **Account-ban risk (Roblox ToS):** bulk scanning may trigger IP limits / account bans. This tool is for research and personal asset inventory. **The author is not responsible** for any account, Robux, or data loss.
+> - **NEVER share tokens/cookies/passwords:** `.ROBLOSECURITY` grants full account access (bypasses 2FA). Never send `cookies.txt` or `config.json` (which contains your webhook URL) to anyone.
+> - **Prevent secret leaks on git:** this repo currently has **no `.gitignore`**. Before `git init` / push, create a `.gitignore` containing at least:
+>
+> ```gitignore
+> config.json
+> cookies.txt
+> .env
+> proxies.txt
+> tor/data/
+> __pycache__/
+> ```
 
-### Information Security
-1. **NEVER share** private tokens, cookies, session keys, webhook secrets, or proxy credentials in any form (screenshots, logs, issues, commits).
-2. **Check `.gitignore`** before pushing — make sure local data files never reach the remote:
+## 4. Quick Start
 
-```gitignore
-config.json
-.env
-data/input/proxies.txt
-data/input/cards.txt
-data/input/bins.txt
-data/output/
-data/last_run.json
-__pycache__/
+Requirements: **Windows 10/11 + Python 3.9+** (verified working on Python 3.11.6).
+
+```powershell
+pip install -r requirements.txt
 ```
 
----
+Actual dependencies (`requirements.txt`, 3 packages): `aiohttp>=3.9.0`, `rich>=13.7.0`, `psutil>=5.9.0`.
 
-## 4. Installation & Usage (Quick Start)
-
-### Requirements
-- **Python 3.10+** (Windows / macOS / Linux — the codebase uses `str | None` type hints).
-- An ANSI-capable terminal (Windows Terminal, iTerm2, VS Code Terminal). Legacy Windows CMD may render colors incorrectly — set `NO_COLOR=1` to disable styling.
-
-### Step 1 — Install dependencies
-
-```bash
-pip install curl_cffi requests cloudscraper
-```
-
-| Package       | Role                                                                          |
-|---------------|-------------------------------------------------------------------------------|
-| `curl_cffi`   | **Required** — TLS/JA3/JA4 + HTTP/2 impersonation (Chrome/Safari/Firefox)     |
-| `requests`    | Fallback when `curl_cffi` cannot be built in the environment                  |
-| `cloudscraper`| Fallback for bypassing Cloudflare challenges when `curl_cffi` is unavailable  |
-
-### Step 2 — Configure `config.json`
-
-Create `config.json` in the project root (all keys are optional):
+Prepare `cookies.txt` (one cookie per line, starting with `_|WARNING:-DO-NOT-SHARE-THIS.`, duplicates auto-filtered) and `config.json`:
 
 ```json
 {
-  "preflight_proxy_check": true,
-  "webhook": {
-    "enabled": false,
-    "discord_url": "",
-    "telegram_bot_token": "",
-    "telegram_chat_id": ""
-  }
+    "webhook_url": "YOUR_WEBHOOK_URL_HERE",
+    "discord_id": "YOUR_DISCORD_ID_HERE",
+    "status_embed": true,
+    "terminal_ui": "dashboard",
+    "tor": { "enabled": true, "amount": 2, "port": 10080 }
 }
 ```
 
-- `preflight_proxy_check: true` — enables the multi-threaded proxy health check before running (only applies when the pool has more than 1 proxy).
-- `webhook.enabled: true` — enables HIT notifications; fill in `discord_url` and/or the `telegram_bot_token` + `telegram_chat_id` pair.
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `webhook_url` | `string` | Discord webhook receiving embeds and `scan_report.zip`. |
+| `discord_id` | `string` | User ID to ping as `<@id>` when a group passes the filters. |
+| `status_embed` | `bool` | `true` = 1 live message/account; `false` = one-off webhook per group. |
+| `terminal_ui` | `string` | `"dashboard"` (live ANSI) or `"classic"` (Rich log). |
+| `tor.enabled/amount/port` | `bool/int/int` | Enable public Tor routing, tunnel count, starting SOCKS5 port. |
 
-### Step 3 — Prepare input data
+Run:
 
-| File | Format | Example |
-|------|--------|---------|
-| `data/input/bins.txt` | `BIN\|MM\|YYYY` or `BIN\|MM\|YY` | `462239111654\|08\|2027` |
-| `data/input/cards.txt` | `CC\|MM\|YYYY\|CVV` | `4622391116540413\|08\|2027\|031` |
-| `data/input/proxies.txt` | `host:port:user:pass` or `http://user:pass@host:port` | `198.51.100.24:8080:user:pass` |
-
-- Lines starting with `#` are treated as comments and skipped. Files support UTF-8 BOM.
-- Mode 1: run from BINs (cards are generated with valid Luhn, you are asked how many cards per BIN, default 50). Mode 2: use existing cards from `cards.txt`.
-
-### Step 4 — Launch
-
-```bash
+```powershell
 python main.py
 ```
 
-The program prompts for: Checkout link → Card source (1/2) → Mode (1: CCN Bypass CVC, 2: Full CVV) → data file paths. Press **Ctrl+C** to stop safely (the UI restores the cursor).
+Then enter the filter thresholds in the wizard (Robux, Pending, Games, Visits, Clothing).
 
----
-
-## 5. Project Structure & Workflow
-
-### Directory Tree
+## 5. Directory Structure & Workflow
 
 ```text
-whop/
-├── core/
-│   ├── bin_matcher.py        # Offline BIN matcher + billing profiles for 16 countries
-│   ├── hardware_profiles.py  # 18 hardware profiles, WebGL/Canvas/Sentry trace
-│   ├── notifier.py           # Discord Rich Embed & Telegram HTML webhooks
-│   ├── proxy_manager.py      # Multi-threaded pre-flight check, ranking, eviction
-│   ├── telemetry.py          # Browser behavior v1, Sardine UUID, WebRTC IP
-│   └── terminal_ui.py        # Terminal UI v2.0 zero-flicker ANSI
-├── data/
-│   ├── input/
-│   │   ├── bins.txt          # Source BIN list
-│   │   ├── cards.txt         # Existing card list
-│   │   └── proxies.txt       # Proxy pool
-│   ├── output/
-│   │   └── whop_hits.txt     # Successful payments (HITs)
-│   └── last_run.json         # Last session state
-├── config.json               # Proxy check & webhook configuration
-├── main.py                   # Entry point & full flow orchestration
-└── README.md
+Owned-group-check/
+├── main.py              # Scanner v2.5.0: async engine, DomainPacer, UI, webhook, ZIP
+├── config.json          # Webhook, Discord ID, UI, Tor (NEVER commit the real file)
+├── cookies.txt          # Cookie input (NEVER commit the real file)
+├── requirements.txt     # aiohttp, rich, psutil
+└── tor/
+    ├── __init__.py
+    ├── tor_manager.py   # Lifecycle of N tor.exe processes, IsolateSOCKSAuth
+    └── tor.exe          # Tor binary (Windows)
 ```
 
-### Execution Flow (Input → Processing → Output)
+Runtime flow (`GroupScanner.start` in `main.py`):
 
 ```text
-[data/input/]                  [PRE-FLIGHT]                          [PROCESSING]
-bins.txt / cards.txt  ──────>  Proxy health check (20 workers)  ──┐
-proxies.txt           ──────>  Rank by latency/country         ──┤
-                                                                  ▼
-                 Checkout link ──> Resolve Plan ID ──> Hardware profile + Telemetry
-                                                                  │
-                                                                  ▼
-                     [OUTPUT]                       BasisTheory tokenize ──> Confirm token
-  whop_hits.txt <── HIT record (card, amount, plan) <── 3DS / Status polling
-  Discord / Telegram webhook <──────────────────────────┘
+Input (cookies.txt + config.json + filter wizard)
+  → scan_cookie per account (auth over Direct IP, public via Tor if enabled)
+  → check_and_send per group (Semaphore 3, single atomic stats commit)
+  → run_recheck_pass 2 rounds (undo old stats, fetch failed branches only)
+  → send_grand_totals_webhook (compact YAML + in-RAM scan_report.zip)
+Output (terminal dashboard + Discord embed/account + Grand Totals + ZIP)
 ```
 
----
+```mermaid
+flowchart TD
+    A[cookies.txt + config.json] --> B[scan_cookie: auth Direct IP]
+    B --> C{rank 255?}
+    C -- no --> D[skip]
+    C -- yes --> E[check_and_send: Semaphore 3]
+    E --> F{passes filter?}
+    F -- yes --> G[SENT / SENT_PARTIAL / WEBHOOK_FAIL]
+    F -- no + metric error --> H[PARTIAL]
+    F -- no --> I[SKIP]
+    H --> J[recheck_queue]
+    G --> K{webhook send error?}
+    K -- SENT_PARTIAL / WEBHOOK_FAIL / FAIL --> J
+    J --> L[run_recheck_pass x2: undo + fetch failed branches]
+    L --> M{still failing?}
+    M -- yes --> N[unresolved_groups]
+    M -- no --> O[recovered]
+    G --> P[all_matched_groups]
+    P --> Q[Grand Totals + scan_report.zip]
+    N --> Q
+```
 
 ## 6. Troubleshooting / FAQ
 
-**1. `ImportError: cannot import name 'requests' from 'curl_cffi'` / missing libraries**
-Cause: `curl_cffi` is not installed or its binary is broken on your OS. Fix:
-`pip install --upgrade curl_cffi`. On older Windows, install the Visual C++ Redistributable. If it cannot be built, the tool falls back to `cloudscraper` → `requests` (losing TLS impersonation, which is easier to block) — some requests may return 403 in that case.
+1. **`ModuleNotFoundError: No module named 'aiohttp'`**
+   Dependencies missing or wrong interpreter. Run `python -m pip install -r requirements.txt` in the same venv, then retry `python main.py`.
 
-**2. Proxies load but all fail the pre-flight check**
-Cause: wrong format or dead proxies. Valid formats: `host:port:user:pass` or `http://user:pass@host:port` (a 2-part `host:port` also works). Files support UTF-8 BOM (the reader uses `utf-8-sig`). Verify a proxy is alive with `curl -x <proxy> https://api.ipify.org`.
+2. **Bad cookie format / `401 Unauthorized`, account not scannable**
+   Cookies must be full lines starting with `_|WARNING:-DO-NOT-SHARE-THIS.`. Cookies returning `401/403` are counted as `invalid_cookies` and skipped. Grab a fresh cookie and keep one cookie per line in `cookies.txt`.
 
-**3. `Invalid checkout link!!!` or Plan ID cannot be resolved**
-Cause: the link does not belong to `whop.com`, the short link (`ch_...`) has expired, or the checkout session has been reset. Fix: use a freshly generated direct checkout link, or enter the `plan_id` manually when the console asks. Responses containing `checkout session malformed` are retried up to 3 times, then that card is skipped (it does not count toward the decline streak).
+3. **Expired token/CSRF (`403`, `x-csrf-token`) or proxy/Tor errors**
+   The code auto-picks a fresh `x-csrf-token` from the `403` header for retry. If a Tor `port` is occupied or `tor/tor.exe` is missing, set `"tor": {"enabled": false}` to run fully on Direct IP.
 
-**4. The tool stops after several cards: `5 consecutive declines — stopping`**
-This is an intentional safety mechanism (decline streak ≥ 5) to avoid spamming and protect the account/IP. Fix: review BIN/card quality (prepaid cards decline more often), switch to a cleaner proxy range, or lower cards per BIN. Note: `3DS required` / `requires_action` also count toward the streak.
-
-**5. HIT notifications are not sent to webhooks**
-Verify `config.json`: `webhook.enabled` must be `true`; Discord needs a valid `discord_url` for the channel webhook; Telegram needs `telegram_bot_token` + `telegram_chat_id` (with the bot added to the group). Network errors while sending webhooks never interrupt the session — HITs are still written to `data/output/whop_hits.txt`.
-
----
+4. **Rate-limit `429` / groups stuck at `PARTIAL`, scan slowing down**
+   Expected when Roblox throttles an IP. `DomainPacer` auto-throttles; at the end `run_recheck_pass` rotates the exit IP and refetches only failed branches. Raise `tor.amount` (e.g. 2 → 5) for better distribution, and wait for the final ZIP instead of stopping early.
 
 ## 7. Connect & Support
 
-- **Discord**: [https://discord.gg/rxw8Hwk3qA](https://discord.gg/rxw8Hwk3qA)
-- **TikTok**: [@lakofusion](https://www.tiktok.com/@lakofusion)
-- **YouTube**: [@lakofusion2010](https://www.youtube.com/@lakofusion2010)
-
----
+- Discord: <https://discord.gg/rxw8Hwk3qA>
+- TikTok: [@lakofusion](https://www.tiktok.com/@lakofusion)
+- YouTube: [@lakofusion2010](https://www.youtube.com/@lakofusion2010)
 
 ## 8. License
 
-Released under the **MIT License**.
-
-```text
-MIT License
-
-Copyright (c) 2026 lakofusion
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+MIT License.
